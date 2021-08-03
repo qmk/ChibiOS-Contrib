@@ -1,0 +1,9 @@
+.\objects\wb32f10x_anctl.o: ..\..\..\..\os\hal\ports\WB32\WB32F10x\wb32f10x_anctl.c
+.\objects\wb32f10x_anctl.o: ..\..\..\..\os\hal\ports\WB32\WB32F10x\wb32f10x_anctl.h
+.\objects\wb32f10x_anctl.o: ..\..\..\..\os\common\ext\CMSIS\WB32\WB32F10x\wb32f10x.h
+.\objects\wb32f10x_anctl.o: ..\..\..\..\..\chibios\os\common\ext\ARM\CMSIS\Core\Include\core_cm3.h
+.\objects\wb32f10x_anctl.o: C:\Keil\Keil_v523\ARM\ARMCC\Bin\..\include\stdint.h
+.\objects\wb32f10x_anctl.o: ..\..\..\..\..\chibios\os\common\ext\ARM\CMSIS\Core\Include\cmsis_version.h
+.\objects\wb32f10x_anctl.o: ..\..\..\..\..\chibios\os\common\ext\ARM\CMSIS\Core\Include\cmsis_compiler.h
+.\objects\wb32f10x_anctl.o: ..\..\..\..\..\chibios\os\common\ext\ARM\CMSIS\Core\Include\cmsis_armcc.h
+.\objects\wb32f10x_anctl.o: ..\..\..\..\..\chibios\os\common\ext\ARM\CMSIS\Core\Include\mpu_armv7.h
