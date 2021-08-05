@@ -1,9 +1,0 @@
-.\objects\wb32f10x_pwr.o: ..\..\..\..\os\hal\ports\WB32\WB32F10x\wb32f10x_pwr.c
-.\objects\wb32f10x_pwr.o: ..\..\..\..\os\hal\ports\WB32\WB32F10x\wb32f10x_pwr.h
-.\objects\wb32f10x_pwr.o: ..\..\..\..\os\common\ext\CMSIS\WB32\WB32F10x\wb32f10x.h
-.\objects\wb32f10x_pwr.o: ..\..\..\..\..\chibios\os\common\ext\ARM\CMSIS\Core\Include\core_cm3.h
-.\objects\wb32f10x_pwr.o: C:\Keil\Keil_v523\ARM\ARMCC\Bin\..\include\stdint.h
-.\objects\wb32f10x_pwr.o: ..\..\..\..\..\chibios\os\common\ext\ARM\CMSIS\Core\Include\cmsis_version.h
-.\objects\wb32f10x_pwr.o: ..\..\..\..\..\chibios\os\common\ext\ARM\CMSIS\Core\Include\cmsis_compiler.h
-.\objects\wb32f10x_pwr.o: ..\..\..\..\..\chibios\os\common\ext\ARM\CMSIS\Core\Include\cmsis_armcc.h
-.\objects\wb32f10x_pwr.o: ..\..\..\..\..\chibios\os\common\ext\ARM\CMSIS\Core\Include\mpu_armv7.h
