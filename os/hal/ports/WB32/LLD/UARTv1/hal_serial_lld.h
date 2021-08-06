@@ -281,7 +281,7 @@ typedef struct {
   /**
    * @brief This member configures the UART communication baud rate.
    */
-  uint32_t UART_BaudRate;   
+  uint32_t speed;   
   /**
    * @brief Specifies the number of data bits transmitted or received in a frame.
    * This parameter can be a value of @ref UART_Word_Length

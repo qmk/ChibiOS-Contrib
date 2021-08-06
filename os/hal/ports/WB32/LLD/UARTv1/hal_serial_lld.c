@@ -77,9 +77,9 @@ static const SerialConfig default_config =
 static void uart_init(SerialDriver *sdp, const SerialConfig *config) {
   uint32_t divider, apbclock;
   RCC_ClocksTypeDef RCC_ClocksStatus;
-  UART_TypeDef *u = uartp->usart;
+  UART_TypeDef *u = sdp->uart;
 
-  u->MCR = (u->MCR & 0x50) | uartp->config->UART_AutoFlowControl;
+  u->MCR = (u->MCR & 0x50) | config->UART_AutoFlowControl;
 
    /* Baud rate setting.*/
   RCC_GetClocksFreq(&RCC_ClocksStatus);
@@ -93,7 +93,7 @@ static void uart_init(SerialDriver *sdp, const SerialConfig *config) {
   }
 
   // round off
-  divider = (apbclock + (uartp->config->UART_BaudRate >> 1)) / uartp->config->UART_BaudRate;
+  divider = (apbclock + (config->speed >> 1)) / config->speed;
 
   u->DLF = divider & 0x0F;
   u->LCR = UART_LCR_DLAB;
@@ -101,13 +101,13 @@ static void uart_init(SerialDriver *sdp, const SerialConfig *config) {
   u->DLH = (uint8_t)(divider >> 12);
   u->LCR = 0x00;
 
-  u->LCR = uartp->config->UART_WordLength | uartp->config->UART_StopBits | uartp->config->UART_Parity;
+  u->LCR = config->UART_WordLength | config->UART_StopBits | config->UART_Parity;
 
   u->SRT = UART_RxFIFOThreshold_1;
   u->SFE = 0x01;
 
   /* Note that some bits are enforced.*/
-  u->IER |= UART_IT_RDA | UART_IT_THRE | UART_IT_RLS;
+  u->IER |= UART_IT_RDA | UART_IT_RLS;
 
   /* Deciding mask to be applied on the data register on receive, this is
      required in order to mask out the parity bit.*/
@@ -176,17 +176,17 @@ static void set_error(SerialDriver *sdp, uint16_t sr) {
  * @param[in] sdp       communication channel associated to the UART
  */
 static void serve_interrupt(SerialDriver *sdp) {
+#define UART_SR_STATUS (UART_LINE_STATUS_PE | \
+                        UART_LINE_STATUS_FE | \
+                        UART_LINE_STATUS_OE | \
+                         UART_LINE_STATUS_DR)
   UART_TypeDef *u = sdp->uart;
-  uint32_t sr,ier;
-  uint8_t rbyte;
-  uint8_t int_id;
+  uint8_t sr;
 
-  int_id = (u->IIR & UART_IIR_INTID_Msk);
-  sr = (uint32_t) u->LSR;
-  ier = u->IER;
+  sr = (uint8_t) u->LSR;
 
   /* Special case, LIN break detection.*/
-  if ((int_id & UART_INTID_RLS) == UART_INTID_RLS) {
+  if ((sr & UART_LINE_STATUS_BI) != RESET) {
     osalSysLockFromISR();
     chnAddFlagsI(sdp, SD_BREAK_DETECTED);
     osalSysUnlockFromISR();
@@ -194,23 +194,21 @@ static void serve_interrupt(SerialDriver *sdp) {
 
   /* Data available.*/
   osalSysLockFromISR();
-  while ((sr & (UART_LINE_STATUS_PE | UART_LINE_STATUS_FE | UART_LINE_STATUS_OE |
-               UART_LINE_STATUS_DR |UART_LINE_STATUS_BI)) | 
-               ((u-USR & UART_FLAG_RFNE) != RESET)) {
+  while ((sr & UART_SR_STATUS) | ((sr & UART_LINE_STATUS_DR) != RESET)) {
     uint8_t b;
 
     /* Error condition detection.*/
-    if (sr & (UART_SR_ORE | UART_SR_NE | UART_SR_FE  | UART_SR_PE))
+    if (sr & UART_SR_STATUS)
       set_error(sdp, sr);
     b = (uint8_t)u->RBR & sdp->rxmask;
-    if ((u->USR & UART_FLAG_RFNE) != RESET)
+    if ((sr & UART_LINE_STATUS_DR) != RESET)
       sdIncomingDataI(sdp, b);
     sr = (uint32_t) u->LSR;
   }
   osalSysUnlockFromISR();
 
   /* Transmission buffer empty.*/
-  if ((ier & UART_IT_THRE) && ((sr & UART_LINE_STATUS_THRE) != RESET)) {
+  if (((u->IER & UART_IT_THRE) !=RESET ) && (sr & UART_LINE_STATUS_THRE) != RESET) {
     msg_t b;
     osalSysLockFromISR();
     b = oqGetI(&sdp->oqueue);
@@ -222,13 +220,11 @@ static void serve_interrupt(SerialDriver *sdp) {
       u->THR = b;
     osalSysUnlockFromISR();
   }
-
   /* Physical transmission end.*/
-  if ((ier & UART_IT_THRE) && ((sr & UART_LINE_STATUS_TEMT) != RESET)) {
+  if (((u->IER & UART_IT_THRE) !=RESET ) && (sr & UART_LINE_STATUS_TEMT) != RESET) {
     osalSysLockFromISR();
     if (oqIsEmptyI(&sdp->oqueue)) {
       chnAddFlagsI(sdp, CHN_TRANSMISSION_END);
-      u->CR1 = cr1 & ~UART_CR1_TCIE;
     }
     osalSysUnlockFromISR();
   }
@@ -263,7 +259,7 @@ static void notify3(io_queue_t *qp) {
 /*===========================================================================*/
 
 #if WB32_SERIAL_USE_UART1 || defined(__DOXYGEN__)
-#if !defined(WB32_UART1_HANDLER)
+#if !defined(WB32_UART1_IRQ_VECTOR)
 #error "WB32_UART1_HANDLER not defined"
 #endif
 /**
@@ -271,7 +267,7 @@ static void notify3(io_queue_t *qp) {
  *
  * @isr
  */
-OSAL_IRQ_HANDLER(WB32_UART1_HANDLER) {
+OSAL_IRQ_HANDLER(WB32_UART1_IRQ_VECTOR) {
 
   OSAL_IRQ_PROLOGUE();
 
@@ -282,7 +278,7 @@ OSAL_IRQ_HANDLER(WB32_UART1_HANDLER) {
 #endif
 
 #if WB32_SERIAL_USE_UART2 || defined(__DOXYGEN__)
-#if !defined(WB32_UART2_HANDLER)
+#if !defined(WB32_UART2_IRQ_VECTOR)
 #error "WB32_UART2_HANDLER not defined"
 #endif
 /**
@@ -290,7 +286,7 @@ OSAL_IRQ_HANDLER(WB32_UART1_HANDLER) {
  *
  * @isr
  */
-OSAL_IRQ_HANDLER(WB32_UART2_HANDLER) {
+OSAL_IRQ_HANDLER(WB32_UART2_IRQ_VECTOR) {
 
   OSAL_IRQ_PROLOGUE();
 
@@ -301,7 +297,7 @@ OSAL_IRQ_HANDLER(WB32_UART2_HANDLER) {
 #endif
 
 #if WB32_SERIAL_USE_UART3 || defined(__DOXYGEN__)
-#if !defined(WB32_UART3_HANDLER)
+#if !defined(WB32_UART3_IRQ_VECTOR)
 #error "WB32_UART3_HANDLER not defined"
 #endif
 /**
@@ -309,7 +305,7 @@ OSAL_IRQ_HANDLER(WB32_UART2_HANDLER) {
  *
  * @isr
  */
-OSAL_IRQ_HANDLER(WB32_UART3_HANDLER) {
+OSAL_IRQ_HANDLER(WB32_UART3_IRQ_VECTOR) {
 
   OSAL_IRQ_PROLOGUE();
 
@@ -366,6 +362,9 @@ void sd_lld_start(SerialDriver *sdp, const SerialConfig *config) {
     if (&SD1 == sdp) {
       /* UART1 clock enable */
       RCC_APB1PeriphClockCmd(RCC_APB1Periph_BMX1 | RCC_APB1Periph_UART1, ENABLE);
+      /* UART1 DeInit */
+      RCC_APB1PeriphResetCmd(RCC_APB1Periph_UART1, ENABLE);
+      RCC_APB1PeriphResetCmd(RCC_APB1Periph_UART1, DISABLE);
       nvicEnableVector(WB32_UART1_NUMBER, WB32_SERIAL_UART1_PRIORITY);
     }
 #endif
@@ -373,6 +372,9 @@ void sd_lld_start(SerialDriver *sdp, const SerialConfig *config) {
     if (&SD2 == sdp) {
        /* UART2 clock enable */
       RCC_APB2PeriphClockCmd(RCC_APB2Periph_BMX2 | RCC_APB2Periph_UART2, ENABLE);
+      /* UART2 DeInit */
+      RCC_APB2PeriphResetCmd(RCC_APB2Periph_UART2, ENABLE);
+      RCC_APB2PeriphResetCmd(RCC_APB2Periph_UART2, DISABLE);
       nvicEnableVector(WB32_UART2_NUMBER, WB32_SERIAL_UART2_PRIORITY);
     }
 #endif
@@ -380,6 +382,9 @@ void sd_lld_start(SerialDriver *sdp, const SerialConfig *config) {
     if (&SD3 == sdp) {
       /* UART3 clock enable */
       RCC_APB2PeriphClockCmd(RCC_APB2Periph_BMX2 | RCC_APB2Periph_UART3, ENABLE);
+      /* UART3 DeInit */
+      RCC_APB2PeriphResetCmd(RCC_APB2Periph_UART3, ENABLE);
+      RCC_APB2PeriphResetCmd(RCC_APB2Periph_UART3, DISABLE);
       nvicEnableVector(WB32_UART3_NUMBER, WB32_SERIAL_UART3_PRIORITY);
     }
 #endif
